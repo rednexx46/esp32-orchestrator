@@ -2,9 +2,6 @@ services:
   orchestrator:
     build: .
     container_name: orchestrator
-    depends_on:
-      - mongodb
-      - mosquitto
     environment:
       - MONGO_USER=iotuser
       - MONGO_PASS=iotpass
