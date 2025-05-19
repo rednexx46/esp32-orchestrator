@@ -11,4 +11,7 @@ services:
       - MONGO_COLLECTION=sensor_data
       - MQTT_BROKER=mosquitto
       - MQTT_PORT=1883
+      - MQTT_TOPIC=mesh/data/
+      - MQTT_USERNAME=orchestrator
+      - MQTT_PASSWORD=mqtt_pass
     restart: always

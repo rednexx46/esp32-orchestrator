@@ -77,8 +77,15 @@ func main() {
 
 	mqttBroker := os.Getenv("MQTT_BROKER")
 	mqttPort := os.Getenv("MQTT_PORT")
+	mqttTopic := os.Getenv("MQTT_TOPIC")
+	mqttUser := os.Getenv("MQTT_USERNAME")
+	mqttPass := os.Getenv("MQTT_PASSWORD")
+
 	if mqttPort == "" {
 		mqttPort = "1883"
+	}
+	if mqttTopic == "" {
+		mqttTopic = "mesh/data/"
 	}
 
 	opts := mqtt.NewClientOptions().
@@ -86,9 +93,16 @@ func main() {
 		SetClientID("mqtt-orchestrator").
 		SetCleanSession(true)
 
+	if mqttUser != "" {
+		opts.SetUsername(mqttUser)
+	}
+	if mqttPass != "" {
+		opts.SetPassword(mqttPass)
+	}
+
 	opts.OnConnect = func(c mqtt.Client) {
 		fmt.Println("[MQTT] Connected to broker.")
-		if token := c.Subscribe("mesh/data/#", 0, messageHandler); token.Wait() && token.Error() != nil {
+		if token := c.Subscribe(mqttTopic+"#", 0, messageHandler); token.Wait() && token.Error() != nil {
 			log.Fatalf("[MQTT] Subscribe error: %v", token.Error())
 		}
 	}
