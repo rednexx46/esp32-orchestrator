@@ -60,7 +60,7 @@ func storeToMongo(data SensorData) {
 		}
 
 		payload := fmt.Sprintf(`{"text": "%s"}`, data.Payload)
-		req, err := http.NewRequest("POST", cipherAPI, strings.NewReader(payload))
+		req, err := http.NewRequest("POST", cipherAPI+"encrypt", strings.NewReader(payload))
 		if err != nil {
 			log.Printf("[CipherAPI] Request creation failed: %v", err)
 			return
