@@ -9,6 +9,7 @@ This service listens to MQTT messages forwarded by the ESP32 gateway, which coll
 * Subscribes to `mesh/data/#` MQTT topics
 * Extracts device ID and payload
 * Saves data to MongoDB with timestamp
+* Optionally encrypts payload using a separate Cipher API
 * Fully configurable via environment variables
 * Lightweight and production-ready
 
@@ -18,6 +19,8 @@ This service listens to MQTT messages forwarded by the ESP32 gateway, which coll
 
 ```text
 [ESP32 Nodes] --> [ESP32 Gateway] --> [MQTT Broker] --> [Orchestrator] --> [MongoDB]
+                                            \
+                                             --> [Cipher API (optional)]
 ```
 
 ---
@@ -26,24 +29,27 @@ This service listens to MQTT messages forwarded by the ESP32 gateway, which coll
 
 * Running MQTT broker (e.g. Mosquitto)
 * MongoDB instance (can be local or in Docker)
+* Optional: Cipher API for encrypting payloads before storage
 
 ---
 
 ## ⚙️ Environment Variables
 
-| Variable           | Description               | Example           |
-| ------------------ | ------------------------- | ----------------- |
-| `MONGO_USER`       | MongoDB username          | `iotuser`         |
-| `MONGO_PASS`       | MongoDB password          | `iotpass`         |
-| `MONGO_HOST`       | MongoDB host name or IP   | `mongodb`         |
-| `MONGO_PORT`       | MongoDB port              | `27017`           |
-| `MONGO_DATABASE`   | Target MongoDB database   | `iot_mesh`        |
-| `MONGO_COLLECTION` | Target MongoDB collection | `sensor_data`     |
-| `MQTT_BROKER`      | MQTT broker host          | `mosquitto`       |
-| `MQTT_PORT`        | MQTT broker port          | `1883`            |
-| `MQTT_TOPIC`       | MQTT topic to subscribe   | `mesh/data/`      |
-| `MQTT_USERNAME`    | MQTT username (optional)  | `orchestrator`    |
-| `MQTT_PASSWORD`    | MQTT password (optional)  | `mqtt_pass` |
+| Variable           | Description               | Example                   |
+| ------------------ | ------------------------- | ------------------------- |
+| `MONGO_USER`       | MongoDB username          | `iotuser`                 |
+| `MONGO_PASS`       | MongoDB password          | `iotpass`                 |
+| `MONGO_HOST`       | MongoDB host name or IP   | `mongodb`                 |
+| `MONGO_PORT`       | MongoDB port              | `27017`                   |
+| `MONGO_DATABASE`   | Target MongoDB database   | `iot_mesh`                |
+| `MONGO_COLLECTION` | Target MongoDB collection | `sensor_data`             |
+| `MQTT_BROKER`      | MQTT broker host          | `mosquitto`               |
+| `MQTT_PORT`        | MQTT broker port          | `1883`                    |
+| `MQTT_TOPIC`       | MQTT topic to subscribe   | `mesh/data/`              |
+| `MQTT_USERNAME`    | MQTT username (optional)  | `orchestrator`            |
+| `MQTT_PASSWORD`    | MQTT password (optional)  | `mqtt_pass`               |
+| `ENCRYPTION`       | Enable payload encryption | `true` or `false`         |
+| `ENCRYPT_API_URL`  | Cipher API URL            | `http://cipher-api:8080/encrypt` |
 
 ---
 
@@ -81,6 +87,8 @@ Each document inserted has the following structure:
 }
 ```
 
+⚠️ If encryption is enabled, the payload will be stored as a ciphered string.
+
 ---
 
 ## 🔒 Security Notes
@@ -88,3 +96,4 @@ Each document inserted has the following structure:
 * Be sure to protect MongoDB with authentication.
 * Use Docker secrets or .env for managing sensitive values.
 * If using MQTT auth, match credentials with your broker config.
+* Always validate and secure the Cipher API if exposed over the network.

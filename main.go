@@ -3,8 +3,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -49,6 +51,46 @@ func connectMongo() {
 }
 
 func storeToMongo(data SensorData) {
+	encryption := os.Getenv("ENCRYPTION")
+	if strings.ToLower(encryption) == "true" {
+		cipherAPI := os.Getenv("ENCRYPT_API_URL")
+		if cipherAPI == "" {
+			log.Println("[CipherAPI] Encryption enabled but API URL not set.")
+			return
+		}
+
+		payload := fmt.Sprintf(`{"text": "%s"}`, data.Payload)
+		req, err := http.NewRequest("POST", cipherAPI, strings.NewReader(payload))
+		if err != nil {
+			log.Printf("[CipherAPI] Request creation failed: %v", err)
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		client := &http.Client{Timeout: 5 * time.Second}
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Printf("[CipherAPI] Request failed: %v", err)
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			log.Printf("[CipherAPI] Non-200 response: %d", resp.StatusCode)
+			return
+		}
+
+		var result struct {
+			Result string `json:"result"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			log.Printf("[CipherAPI] Decode failed: %v", err)
+			return
+		}
+
+		data.Payload = result.Result
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, err := dataCollection.InsertOne(ctx, data)

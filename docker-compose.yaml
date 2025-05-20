@@ -14,4 +14,6 @@ services:
       - MQTT_TOPIC=mesh/data/
       - MQTT_USERNAME=orchestrator
       - MQTT_PASSWORD=mqtt_pass
+      - ENCRYPTION=true
+      - ENCRYPT_API_URL=http://cipher-api:8080/
     restart: always
