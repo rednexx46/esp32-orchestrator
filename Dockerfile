@@ -4,7 +4,8 @@ FROM golang:1.24-alpine AS builder
 WORKDIR /app
 COPY . .
 
-RUN go build -o orchestrator .
+# Install necessary packages
+RUN go env -w GODEBUG=netdns=go && go build -o orchestrator .
 
 # Runtime stage
 FROM alpine:latest
