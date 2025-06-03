@@ -5,7 +5,10 @@ WORKDIR /app
 COPY . .
 
 # Install necessary packages
-RUN go env -w GODEBUG=netdns=go && go build -o orchestrator .
+ENV GODEBUG=netdns=go
+
+# Build the Go application
+RUN go build -o orchestrator .
 
 # Runtime stage
 FROM alpine:latest
