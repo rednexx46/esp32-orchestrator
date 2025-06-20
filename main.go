@@ -28,6 +28,7 @@ type SensorData struct {
 var mongoClient *mongo.Client
 var dataCollection *mongo.Collection
 var kpiCollection *mongo.Collection
+var statusCollection *mongo.Collection
 
 func connectMongo() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -51,7 +52,8 @@ func connectMongo() {
 	db := mongoClient.Database(mongoDB)
 	dataCollection = db.Collection(mongoCol)
 	kpiCollection = db.Collection("kpis")
-	fmt.Printf("[MongoDB] Connected to %s.%s and %s.kpis\n", mongoDB, mongoCol, mongoDB)
+	statusCollection = db.Collection("status")
+	fmt.Printf("[MongoDB] Connected to %s at %s:%s\n", mongoDB, mongoHost, mongoPort)
 }
 
 func storeToMongo(data SensorData) {
@@ -138,21 +140,45 @@ func storeKPIToMongo(data SensorData) {
 	fmt.Println("[MongoDB] KPI data stored.")
 }
 
+func storeStatusToMongo(payload string, timestamp time.Time) {
+	var statusData map[string]interface{}
+	if err := json.Unmarshal([]byte(payload), &statusData); err != nil {
+		log.Printf("[MongoDB] Failed to parse status JSON: %v", err)
+		return
+	}
+
+	statusData["timestamp"] = timestamp
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := statusCollection.InsertOne(ctx, statusData)
+	if err != nil {
+		log.Printf("[MongoDB] Status insert failed: %v", err)
+		return
+	}
+	fmt.Println("[MongoDB] Status data stored.")
+}
+
 func messageHandler(client mqtt.Client, msg mqtt.Message) {
 	topic := msg.Topic()
 	topicParts := strings.Split(topic, "/")
 	deviceID := topicParts[len(topicParts)-1]
 
-	data := SensorData{
-		DeviceID:  deviceID,
-		Payload:   string(msg.Payload()),
-		Timestamp: time.Now(),
-	}
-	fmt.Printf("[MQTT] Received from %s: %s\n", deviceID, data.Payload)
+	payloadStr := string(msg.Payload())
+	timestamp := time.Now()
 
-	if strings.HasPrefix(topic, "mesh/kpi/") {
+	fmt.Printf("[MQTT] Received on %s: %s\n", topic, payloadStr)
+
+	switch {
+	case strings.HasPrefix(topic, os.Getenv("MQTT_KPI_TOPIC")):
+		data := SensorData{DeviceID: deviceID, Payload: payloadStr, Timestamp: timestamp}
 		storeKPIToMongo(data)
-	} else {
+
+	case strings.HasPrefix(topic, os.Getenv("MQTT_MESH_STATUS_TOPIC")):
+		storeStatusToMongo(payloadStr, timestamp)
+
+	default:
+		data := SensorData{DeviceID: deviceID, Payload: payloadStr, Timestamp: timestamp}
 		storeToMongo(data)
 	}
 }
@@ -164,6 +190,7 @@ func main() {
 	mqttPort := os.Getenv("MQTT_PORT")
 	mqttTopic := os.Getenv("MQTT_TOPIC")
 	mqttKpiTopic := os.Getenv("MQTT_KPI_TOPIC")
+	mqttStatusTopic := os.Getenv("MQTT_MESH_STATUS_TOPIC")
 	mqttUser := os.Getenv("MQTT_USERNAME")
 	mqttPass := os.Getenv("MQTT_PASSWORD")
 
@@ -173,9 +200,11 @@ func main() {
 	if mqttTopic == "" {
 		mqttTopic = "mesh/data/"
 	}
-
 	if mqttKpiTopic == "" {
 		mqttKpiTopic = "mesh/kpi/"
+	}
+	if mqttStatusTopic == "" {
+		mqttStatusTopic = "mesh/status/"
 	}
 
 	opts := mqtt.NewClientOptions().
@@ -194,8 +223,9 @@ func main() {
 		fmt.Println("[MQTT] Connected to broker.")
 
 		topics := map[string]byte{
-			mqttTopic + "#":    0,
-			mqttKpiTopic + "#": 0,
+			mqttTopic + "#":       0,
+			mqttKpiTopic + "#":    0,
+			mqttStatusTopic + "#": 0,
 		}
 
 		if token := c.SubscribeMultiple(topics, messageHandler); token.Wait() && token.Error() != nil {

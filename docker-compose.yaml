@@ -13,6 +13,7 @@ services:
       - MQTT_PORT=1883
       - MQTT_TOPIC=mesh/data/
       - MQTT_KPI_TOPIC=mesh/kpi/
+      - MQTT_MESH_STATUS_TOPIC=mesh/status/
       - MQTT_USERNAME=orchestrator
       - MQTT_PASSWORD=mqtt_pass
       - ENCRYPTION=true
