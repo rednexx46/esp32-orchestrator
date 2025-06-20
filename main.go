@@ -25,6 +25,7 @@ type SensorData struct {
 
 var mongoClient *mongo.Client
 var dataCollection *mongo.Collection
+var kpiCollection *mongo.Collection
 
 func connectMongo() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -47,7 +48,8 @@ func connectMongo() {
 	mongoClient = client
 	db := mongoClient.Database(mongoDB)
 	dataCollection = db.Collection(mongoCol)
-	fmt.Printf("[MongoDB] Connected to %s.%s\n", mongoDB, mongoCol)
+	kpiCollection = db.Collection("kpis")
+	fmt.Printf("[MongoDB] Connected to %s.%s and %s.kpis\n", mongoDB, mongoCol, mongoDB)
 }
 
 func storeToMongo(data SensorData) {
@@ -101,8 +103,20 @@ func storeToMongo(data SensorData) {
 	fmt.Println("[MongoDB] Data stored.")
 }
 
+func storeKPIToMongo(data SensorData) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := kpiCollection.InsertOne(ctx, data)
+	if err != nil {
+		log.Printf("[MongoDB] KPI insert failed: %v", err)
+		return
+	}
+	fmt.Println("[MongoDB] KPI data stored.")
+}
+
 func messageHandler(client mqtt.Client, msg mqtt.Message) {
-	topicParts := strings.Split(msg.Topic(), "/")
+	topic := msg.Topic()
+	topicParts := strings.Split(topic, "/")
 	deviceID := topicParts[len(topicParts)-1]
 
 	data := SensorData{
@@ -111,7 +125,12 @@ func messageHandler(client mqtt.Client, msg mqtt.Message) {
 		Timestamp: time.Now(),
 	}
 	fmt.Printf("[MQTT] Received from %s: %s\n", deviceID, data.Payload)
-	storeToMongo(data)
+
+	if strings.HasPrefix(topic, "mesh/kpi/") {
+		storeKPIToMongo(data)
+	} else {
+		storeToMongo(data)
+	}
 }
 
 func main() {
