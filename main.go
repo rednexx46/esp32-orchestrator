@@ -169,12 +169,16 @@ func messageHandler(client mqtt.Client, msg mqtt.Message) {
 
 	fmt.Printf("[MQTT] Received on %s: %s\n", topic, payloadStr)
 
+	// Ensure trailing slashes don't break prefix matching
+	kpiPrefix := strings.TrimSuffix(os.Getenv("MQTT_KPI_TOPIC"), "/")
+	statusPrefix := strings.TrimSuffix(os.Getenv("MQTT_MESH_STATUS_TOPIC"), "/")
+
 	switch {
-	case strings.HasPrefix(topic, os.Getenv("MQTT_KPI_TOPIC")):
+	case strings.HasPrefix(topic, kpiPrefix+"/"):
 		data := SensorData{DeviceID: deviceID, Payload: payloadStr, Timestamp: timestamp}
 		storeKPIToMongo(data)
 
-	case strings.HasPrefix(topic, os.Getenv("MQTT_MESH_STATUS_TOPIC")):
+	case topic == statusPrefix:
 		storeStatusToMongo(payloadStr, timestamp)
 
 	default:
