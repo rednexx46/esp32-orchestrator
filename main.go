@@ -8,10 +8,12 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
@@ -104,9 +106,31 @@ func storeToMongo(data SensorData) {
 }
 
 func storeKPIToMongo(data SensorData) {
+	fields := strings.Split(data.Payload, ";")
+	kpiDoc := bson.M{
+		"device_id": data.DeviceID,
+		"timestamp": data.Timestamp,
+	}
+
+	for _, field := range fields {
+		parts := strings.SplitN(field, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		key := parts[0]
+		value := parts[1]
+
+		// Convert numeric fields to int
+		if num, err := strconv.Atoi(value); err == nil {
+			kpiDoc[key] = num
+		} else {
+			kpiDoc[key] = value
+		}
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_, err := kpiCollection.InsertOne(ctx, data)
+	_, err := kpiCollection.InsertOne(ctx, kpiDoc)
 	if err != nil {
 		log.Printf("[MongoDB] KPI insert failed: %v", err)
 		return
