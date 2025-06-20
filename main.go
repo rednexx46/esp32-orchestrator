@@ -163,6 +163,7 @@ func main() {
 	mqttBroker := os.Getenv("MQTT_BROKER")
 	mqttPort := os.Getenv("MQTT_PORT")
 	mqttTopic := os.Getenv("MQTT_TOPIC")
+	mqttKpiTopic := os.Getenv("MQTT_KPI_TOPIC")
 	mqttUser := os.Getenv("MQTT_USERNAME")
 	mqttPass := os.Getenv("MQTT_PASSWORD")
 
@@ -171,6 +172,10 @@ func main() {
 	}
 	if mqttTopic == "" {
 		mqttTopic = "mesh/data/"
+	}
+
+	if mqttKpiTopic == "" {
+		mqttKpiTopic = "mesh/kpi/"
 	}
 
 	opts := mqtt.NewClientOptions().
@@ -187,8 +192,14 @@ func main() {
 
 	opts.OnConnect = func(c mqtt.Client) {
 		fmt.Println("[MQTT] Connected to broker.")
-		if token := c.Subscribe(mqttTopic+"#", 0, messageHandler); token.Wait() && token.Error() != nil {
-			log.Fatalf("[MQTT] Subscribe error: %v", token.Error())
+
+		topics := map[string]byte{
+			mqttTopic + "#":    0,
+			mqttKpiTopic + "#": 0,
+		}
+
+		if token := c.SubscribeMultiple(topics, messageHandler); token.Wait() && token.Error() != nil {
+			log.Fatalf("[MQTT] SubscribeMultiple error: %v", token.Error())
 		}
 	}
 
